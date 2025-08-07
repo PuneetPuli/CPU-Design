@@ -356,13 +356,23 @@ ac220000
                 };
                 this.program = [];
                 this.isRunning = false;
+                this.intervalId = null;
                 this.stats = {
                     completed: 0,
                     stalls: 0,
                     forwards: 0
                 };
-                this.initializeUI();
-                this.loadProgram('simple');
+                
+                // Wait for DOM to be ready
+                if (document.readyState === 'loading') {
+                    document.addEventListener('DOMContentLoaded', () => {
+                        this.initializeUI();
+                        this.loadProgram('simple');
+                    });
+                } else {
+                    this.initializeUI();
+                    this.loadProgram('simple');
+                }
             }
             
             initializeUI() {
@@ -453,6 +463,7 @@ ac220000
             }
             
             step() {
+                console.log(`=== CYCLE ${this.cycle + 1} ===`);
                 this.cycle++;
                 
                 // Simulate pipeline stages (simplified)
@@ -460,6 +471,7 @@ ac220000
                 
                 // WB stage
                 if (this.pipeline.WB) {
+                    console.log('WB stage:', this.pipeline.WB.asm);
                     this.executeWB(this.pipeline.WB);
                     this.stats.completed++;
                 }
@@ -467,31 +479,37 @@ ac220000
                 
                 // MEM stage
                 if (this.pipeline.MEM) {
+                    console.log('MEM stage:', this.pipeline.MEM.asm);
                     this.executeMEM(this.pipeline.MEM);
                 }
                 newPipeline.MEM = this.pipeline.EX;
                 
                 // EX stage
                 if (this.pipeline.EX) {
+                    console.log('EX stage:', this.pipeline.EX.asm);
                     this.executeEX(this.pipeline.EX);
                 }
                 newPipeline.EX = this.pipeline.ID;
                 
                 // ID stage
                 if (this.pipeline.ID) {
+                    console.log('ID stage:', this.pipeline.ID.asm);
                     this.executeID(this.pipeline.ID);
                 }
                 newPipeline.ID = this.pipeline.IF;
                 
                 // IF stage
-                if (this.pc / 4 < this.program.length) {
+                const instrIndex = Math.floor(this.pc / 4);
+                if (instrIndex < this.program.length) {
                     newPipeline.IF = {
-                        ...this.program[this.pc / 4],
+                        ...this.program[instrIndex],
                         pc: this.pc
                     };
+                    console.log('IF stage: fetching', newPipeline.IF.asm, 'at PC', this.pc);
                     this.pc += 4;
                 } else {
                     newPipeline.IF = null;
+                    console.log('IF stage: no more instructions');
                 }
                 
                 this.pipeline = newPipeline;
@@ -500,47 +518,68 @@ ac220000
                 // Check if pipeline is empty
                 if (!this.pipeline.IF && !this.pipeline.ID && !this.pipeline.EX && 
                     !this.pipeline.MEM && !this.pipeline.WB) {
+                    console.log('Pipeline empty, stopping');
                     this.pause();
                 }
             }
             
             executeWB(instr) {
-                // Simplified writeback simulation
-                const opcode = (instr.hex >> 26) & 0x3F;
-                const rt = (instr.hex >> 16) & 0x1F;
-                const rd = (instr.hex >> 11) & 0x1F;
-                
-                if (opcode === 0x08 && rt !== 0) { // addi
-                    this.registers[rt] = (this.registers[rt] + (instr.hex & 0xFFFF)) & 0xFFFFFFFF;
-                    this.highlightRegister(rt);
-                } else if (opcode === 0x23 && rt !== 0) { // lw
-                    const addr = ((instr.hex & 0xFFFF) + this.registers[(instr.hex >> 21) & 0x1F]) / 4;
-                    if (addr >= 0 && addr < this.memory.length) {
-                        this.registers[rt] = this.memory[addr];
-                        this.highlightRegister(rt);
-                    }
-                } else if (opcode === 0x00 && rd !== 0) { // R-type
-                    const func = instr.hex & 0x3F;
+                try {
+                    // Simplified writeback simulation
+                    const opcode = (instr.hex >> 26) & 0x3F;
+                    const rt = (instr.hex >> 16) & 0x1F;
+                    const rd = (instr.hex >> 11) & 0x1F;
                     const rs = (instr.hex >> 21) & 0x1F;
-                    const rt_val = (instr.hex >> 16) & 0x1F;
                     
-                    if (func === 0x20) { // add
-                        this.registers[rd] = (this.registers[rs] + this.registers[rt_val]) & 0xFFFFFFFF;
-                        this.highlightRegister(rd);
+                    console.log(`WB: opcode=${opcode}, rs=${rs}, rt=${rt}, rd=${rd}`);
+                    
+                    if (opcode === 0x08 && rt !== 0) { // addi
+                        const imm = instr.hex & 0xFFFF;
+                        // Sign extend immediate
+                        const signExtImm = imm & 0x8000 ? imm - 0x10000 : imm;
+                        this.registers[rt] = (this.registers[rs] + signExtImm) & 0xFFFFFFFF;
+                        this.highlightRegister(rt);
+                        console.log(`ADDI: $${rt} = $${rs}(${this.registers[rs]}) + ${signExtImm} = ${this.registers[rt]}`);
+                    } else if (opcode === 0x23 && rt !== 0) { // lw
+                        const imm = instr.hex & 0xFFFF;
+                        const signExtImm = imm & 0x8000 ? imm - 0x10000 : imm;
+                        const addr = Math.floor((this.registers[rs] + signExtImm) / 4);
+                        if (addr >= 0 && addr < this.memory.length) {
+                            this.registers[rt] = this.memory[addr];
+                            this.highlightRegister(rt);
+                            console.log(`LW: $${rt} = mem[${addr}] = ${this.registers[rt]}`);
+                        }
+                    } else if (opcode === 0x00 && rd !== 0) { // R-type
+                        const func = instr.hex & 0x3F;
+                        
+                        if (func === 0x20) { // add
+                            this.registers[rd] = (this.registers[rs] + this.registers[rt]) & 0xFFFFFFFF;
+                            this.highlightRegister(rd);
+                            console.log(`ADD: $${rd} = $${rs}(${this.registers[rs]}) + $${rt}(${this.registers[rt]}) = ${this.registers[rd]}`);
+                        }
                     }
+                } catch (e) {
+                    console.error('Error in executeWB:', e);
                 }
             }
             
             executeMEM(instr) {
-                const opcode = (instr.hex >> 26) & 0x3F;
-                if (opcode === 0x2B) { // sw
-                    const rs = (instr.hex >> 21) & 0x1F;
-                    const rt = (instr.hex >> 16) & 0x1F;
-                    const addr = ((instr.hex & 0xFFFF) + this.registers[rs]) / 4;
-                    if (addr >= 0 && addr < this.memory.length) {
-                        this.memory[addr] = this.registers[rt];
-                        this.highlightMemory(addr);
+                try {
+                    const opcode = (instr.hex >> 26) & 0x3F;
+                    if (opcode === 0x2B) { // sw
+                        const rs = (instr.hex >> 21) & 0x1F;
+                        const rt = (instr.hex >> 16) & 0x1F;
+                        const imm = instr.hex & 0xFFFF;
+                        const signExtImm = imm & 0x8000 ? imm - 0x10000 : imm;
+                        const addr = Math.floor((this.registers[rs] + signExtImm) / 4);
+                        if (addr >= 0 && addr < this.memory.length) {
+                            this.memory[addr] = this.registers[rt];
+                            this.highlightMemory(addr);
+                            console.log(`SW: mem[${addr}] = $${rt}(${this.registers[rt]})`);
+                        }
                     }
+                } catch (e) {
+                    console.error('Error in executeMEM:', e);
                 }
             }
             
@@ -606,17 +645,21 @@ ac220000
                 this.isRunning = true;
                 const speed = parseInt(document.getElementById('speedSlider').value);
                 
-                const runStep = () => {
+                this.intervalId = setInterval(() => {
                     if (this.isRunning) {
                         this.step();
-                        setTimeout(runStep, speed);
+                    } else {
+                        clearInterval(this.intervalId);
                     }
-                };
-                runStep();
+                }, speed);
             }
             
             pause() {
                 this.isRunning = false;
+                if (this.intervalId) {
+                    clearInterval(this.intervalId);
+                    this.intervalId = null;
+                }
             }
             
             reset() {
@@ -645,28 +688,55 @@ ac220000
             }
         }
         
-        // Initialize simulator
-        const simulator = new PipelineSimulator();
+        // Initialize simulator when page loads
+        let simulator;
         
-        // Event listeners
-        document.getElementById('stepBtn').addEventListener('click', () => simulator.step());
-        document.getElementById('playBtn').addEventListener('click', () => simulator.play());
-        document.getElementById('pauseBtn').addEventListener('click', () => simulator.pause());
-        document.getElementById('resetBtn').addEventListener('click', () => simulator.reset());
+        function initializeApp() {
+            simulator = new PipelineSimulator();
+            
+            // Event listeners
+            document.getElementById('stepBtn').addEventListener('click', () => {
+                console.log('Step clicked');
+                simulator.step();
+            });
+            
+            document.getElementById('playBtn').addEventListener('click', () => {
+                console.log('Play clicked');
+                simulator.play();
+            });
+            
+            document.getElementById('pauseBtn').addEventListener('click', () => {
+                console.log('Pause clicked');
+                simulator.pause();
+            });
+            
+            document.getElementById('resetBtn').addEventListener('click', () => {
+                console.log('Reset clicked');
+                simulator.reset();
+            });
+            
+            document.getElementById('programSelect').addEventListener('change', (e) => {
+                console.log('Program changed to:', e.target.value);
+                simulator.loadProgram(e.target.value);
+            });
+            
+            document.getElementById('speedSlider').addEventListener('input', (e) => {
+                document.getElementById('speedValue').textContent = e.target.value + 'ms';
+            });
+            
+            document.getElementById('customProgram').addEventListener('change', () => {
+                if (document.getElementById('programSelect').value === 'custom') {
+                    simulator.loadProgram('custom');
+                }
+            });
+        }
         
-        document.getElementById('programSelect').addEventListener('change', (e) => {
-            simulator.loadProgram(e.target.value);
-        });
-        
-        document.getElementById('speedSlider').addEventListener('input', (e) => {
-            document.getElementById('speedValue').textContent = e.target.value + 'ms';
-        });
-        
-        document.getElementById('customProgram').addEventListener('change', () => {
-            if (document.getElementById('programSelect').value === 'custom') {
-                simulator.loadProgram('custom');
-            }
-        });
+        // Initialize when DOM is ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initializeApp);
+        } else {
+            initializeApp();
+        }
     </script>
 </body>
 </html>
