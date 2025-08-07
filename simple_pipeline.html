@@ -3,142 +3,363 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Simple MIPS Pipeline Visualizer</title>
+    <title>MIPS Pipeline Visualizer</title>
     <style>
+        :root {
+            --bg-primary: #1a1a1a;
+            --bg-secondary: #2a2a2a;
+            --bg-tertiary: #333;
+            --bg-quaternary: #444;
+            --text-primary: #fff;
+            --text-secondary: #ccc;
+            --accent-color: #4CAF50;
+            --accent-hover: #45a049;
+            --border-color: #555;
+            --border-light: #666;
+        }
+        
+        [data-theme="light"] {
+            --bg-primary: #f5f5f5;
+            --bg-secondary: #ffffff;
+            --bg-tertiary: #e0e0e0;
+            --bg-quaternary: #d0d0d0;
+            --text-primary: #333;
+            --text-secondary: #666;
+            --accent-color: #2196F3;
+            --accent-hover: #1976D2;
+            --border-color: #ccc;
+            --border-light: #ddd;
+        }
+        
         body {
             font-family: 'Courier New', monospace;
-            margin: 20px;
-            background: #1a1a1a;
-            color: #fff;
+            margin: 0;
+            padding: 20px;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            transition: all 0.3s ease;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            text-align: center;
+            color: var(--accent-color);
+            margin-bottom: 30px;
         }
         
         .controls {
-            margin-bottom: 20px;
+            display: flex;
+            gap: 15px;
+            margin-bottom: 30px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        
+        label {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+        
+        input, select, button {
+            padding: 8px 12px;
+            border: 1px solid var(--border-color);
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            border-radius: 4px;
         }
         
         button {
-            padding: 10px 20px;
-            margin: 5px;
-            background: #4CAF50;
-            color: white;
-            border: none;
-            border-radius: 5px;
+            background: var(--accent-color);
             cursor: pointer;
-            font-size: 16px;
+            transition: background 0.3s;
+            color: white;
         }
         
         button:hover {
-            background: #45a049;
+            background: var(--accent-hover);
+        }
+        
+        button:disabled {
+            background: var(--border-color);
+            cursor: not-allowed;
+        }
+        
+        .theme-toggle {
+            background: var(--bg-quaternary);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
         }
         
         .pipeline {
             display: flex;
             gap: 20px;
-            margin: 20px 0;
+            margin-bottom: 30px;
+            justify-content: center;
         }
         
         .stage {
             flex: 1;
-            border: 2px solid #555;
+            max-width: 200px;
+            min-height: 400px;
+            border: 2px solid var(--border-color);
             border-radius: 8px;
             padding: 15px;
-            background: #2a2a2a;
-            min-height: 200px;
+            background: var(--bg-secondary);
+            position: relative;
         }
         
-        .stage h3 {
-            margin: 0 0 15px 0;
+        .stage-header {
             text-align: center;
-            color: #4CAF50;
+            font-weight: bold;
+            font-size: 18px;
+            margin-bottom: 15px;
+            padding: 8px;
+            background: var(--bg-quaternary);
+            border-radius: 4px;
         }
+        
+        .if { border-color: #FF6B6B; }
+        .id { border-color: #4ECDC4; }
+        .ex { border-color: #45B7D1; }
+        .mem { border-color: #96CEB4; }
+        .wb { border-color: #FFEAA7; }
         
         .instruction {
-            background: #444;
-            border: 1px solid #666;
-            border-radius: 5px;
+            background: var(--bg-quaternary);
+            border: 1px solid var(--border-light);
+            border-radius: 6px;
             padding: 10px;
-            margin: 5px 0;
+            margin-bottom: 10px;
+            transition: all 0.3s ease;
+            position: relative;
         }
         
         .instruction.active {
-            background: #4CAF50;
-            color: black;
+            transform: scale(1.05);
+            box-shadow: 0 0 15px rgba(76, 175, 80, 0.5);
+        }
+        
+        .instruction.stall {
+            background: #8B4513;
+            border-color: #CD853F;
+        }
+        
+        .instruction.nop {
+            background: var(--border-color);
+            opacity: 0.6;
+        }
+        
+        .instr-text {
+            font-size: 14px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .instr-details {
+            font-size: 11px;
+            color: var(--text-secondary);
+            line-height: 1.3;
         }
         
         .cycle-info {
-            font-size: 24px;
             text-align: center;
-            margin: 20px 0;
-            color: #4CAF50;
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 20px;
+            color: var(--accent-color);
         }
         
         .registers {
             display: grid;
             grid-template-columns: repeat(8, 1fr);
             gap: 5px;
-            margin: 20px 0;
+            margin-bottom: 20px;
+            padding: 15px;
+            background: var(--bg-secondary);
+            border-radius: 8px;
         }
         
         .register {
-            background: #333;
             padding: 5px;
+            background: var(--bg-quaternary);
+            border-radius: 4px;
             text-align: center;
-            border-radius: 3px;
-            font-size: 12px;
+            font-size: 11px;
         }
         
-        .register.changed {
-            background: #4CAF50;
-            color: black;
+        .register.modified {
+            background: var(--accent-color);
+            color: white;
+            animation: flash 0.5s;
+        }
+        
+        @keyframes flash {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .memory {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 5px;
+            padding: 15px;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        
+        .memory-cell {
+            padding: 5px;
+            background: var(--bg-quaternary);
+            border-radius: 4px;
+            text-align: center;
+            font-size: 11px;
+        }
+        
+        .memory-cell.accessed {
+            background: #FF6B6B;
+            color: white;
+            animation: flash 0.5s;
+        }
+        
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        .stat-box {
+            background: var(--bg-secondary);
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+        }
+        
+        .stat-title {
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: var(--accent-color);
+        }
+        
+        .custom-program {
+            width: 100%;
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+            padding: 10px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            resize: vertical;
         }
     </style>
 </head>
 <body>
-    <h1>🚀 Simple MIPS Pipeline Visualizer</h1>
-    
-    <div class="controls">
-        <button onclick="step()">Step</button>
-        <button onclick="play()">Play</button>
-        <button onclick="pause()">Pause</button>
-        <button onclick="reset()">Reset</button>
-    </div>
-    
-    <div class="cycle-info">
-        Cycle: <span id="cycle">0</span>
-    </div>
-    
-    <div class="pipeline">
-        <div class="stage">
-            <h3>IF</h3>
-            <div id="if-stage">
-                <div>PC: <span id="pc">0</span></div>
+    <div class="container">
+        <h1>🚀 MIPS Pipeline Visualizer</h1>
+        
+        <div class="controls">
+            <div class="control-group">
+                <label>Sample Program:</label>
+                <select id="programSelect" onchange="loadProgram(this.value)">
+                    <option value="simple">Simple Add/Load</option>
+                    <option value="hazard">Data Hazard Example</option>
+                    <option value="branch">Branch Example</option>
+                    <option value="rtype">R-Type Instructions</option>
+                    <option value="custom">Custom Program</option>
+                </select>
+            </div>
+            
+            <div class="control-group">
+                <label>Speed (ms):</label>
+                <input type="range" id="speedSlider" min="100" max="2000" value="800" oninput="updateSpeed(this.value)">
+                <span id="speedValue">800ms</span>
+            </div>
+            
+            <button onclick="step()">Step</button>
+            <button onclick="play()">Play</button>
+            <button onclick="pause()">Pause</button>
+            <button onclick="reset()">Reset</button>
+            <button class="theme-toggle" onclick="toggleTheme()">🌓 Theme</button>
+        </div>
+        
+        <div class="cycle-info">
+            Cycle: <span id="cycle">0</span>
+        </div>
+        
+        <div class="pipeline">
+            <div class="stage if">
+                <div class="stage-header">IF</div>
+                <div class="stage-content" id="if-content">
+                    <div class="instr-details">PC: <span id="pc-value">0</span></div>
+                </div>
+            </div>
+            
+            <div class="stage id">
+                <div class="stage-header">ID</div>
+                <div class="stage-content" id="id-content"></div>
+            </div>
+            
+            <div class="stage ex">
+                <div class="stage-header">EX</div>
+                <div class="stage-content" id="ex-content"></div>
+            </div>
+            
+            <div class="stage mem">
+                <div class="stage-header">MEM</div>
+                <div class="stage-content" id="mem-content"></div>
+            </div>
+            
+            <div class="stage wb">
+                <div class="stage-header">WB</div>
+                <div class="stage-content" id="wb-content"></div>
             </div>
         </div>
         
-        <div class="stage">
-            <h3>ID</h3>
-            <div id="id-stage"></div>
+        <div class="stats">
+            <div class="stat-box">
+                <div class="stat-title">Registers</div>
+                <div class="registers" id="registers"></div>
+            </div>
+            
+            <div class="stat-box">
+                <div class="stat-title">Data Memory</div>
+                <div class="memory" id="memory"></div>
+            </div>
+            
+            <div class="stat-box">
+                <div class="stat-title">Pipeline Stats</div>
+                <div id="pipeline-stats">
+                    <div>Instructions Completed: <span id="instr-completed">0</span></div>
+                    <div>Stalls: <span id="stall-count">0</span></div>
+                    <div>Forwards: <span id="forward-count">0</span></div>
+                    <div>CPI: <span id="cpi">1.00</span></div>
+                </div>
+            </div>
         </div>
         
-        <div class="stage">
-            <h3>EX</h3>
-            <div id="ex-stage"></div>
+        <div class="stat-box" style="margin-top: 20px;">
+            <div class="stat-title">Custom Program (Hex Instructions)</div>
+            <textarea id="customProgram" class="custom-program" rows="5" onchange="updateCustomProgram()">
+20020005
+20030003
+00431020
+ac220000
+8c240000
+10000001
+00000000
+            </textarea>
         </div>
-        
-        <div class="stage">
-            <h3>MEM</h3>
-            <div id="mem-stage"></div>
-        </div>
-        
-        <div class="stage">
-            <h3>WB</h3>
-            <div id="wb-stage"></div>
-        </div>
-    </div>
-    
-    <div>
-        <h3>Registers</h3>
-        <div class="registers" id="registers"></div>
     </div>
 
     <script>
@@ -146,17 +367,51 @@
         let cycle = 0;
         let pc = 0;
         let registers = new Array(32).fill(0);
+        let memory = new Array(16).fill(0);
         let isRunning = false;
         let intervalId = null;
+        let currentSpeed = 800;
+        let stats = {
+            completed: 0,
+            stalls: 0,
+            forwards: 0
+        };
         
-        // Sample program
-        const program = [
-            { hex: 0x20020005, asm: 'addi $2, $0, 5', desc: 'Load 5 into $2' },
-            { hex: 0x20030003, asm: 'addi $3, $0, 3', desc: 'Load 3 into $3' },
-            { hex: 0x00431020, asm: 'add $2, $2, $3', desc: 'Add $2 + $3 -> $2' },
-            { hex: 0xac220000, asm: 'sw $2, 0($1)', desc: 'Store $2 to mem[0]' },
-            { hex: 0x00000000, asm: 'nop', desc: 'No operation' }
-        ];
+        // Sample programs
+        const programs = {
+            simple: [
+                { hex: 0x20020005, asm: 'addi $2, $0, 5', desc: 'Load 5 into $2' },
+                { hex: 0x20030003, asm: 'addi $3, $0, 3', desc: 'Load 3 into $3' },
+                { hex: 0x00431020, asm: 'add $2, $2, $3', desc: 'Add $2 + $3 -> $2' },
+                { hex: 0xac220000, asm: 'sw $2, 0($1)', desc: 'Store $2 to mem[0]' },
+                { hex: 0x00000000, asm: 'nop', desc: 'No operation' }
+            ],
+            hazard: [
+                { hex: 0x8c220000, asm: 'lw $2, 0($1)', desc: 'Load from mem[0]' },
+                { hex: 0x00421020, asm: 'add $2, $2, $2', desc: 'Use $2 (hazard!)' },
+                { hex: 0x20030001, asm: 'addi $3, $0, 1', desc: 'Load 1 into $3' },
+                { hex: 0x00000000, asm: 'nop', desc: 'No operation' }
+            ],
+            branch: [
+                { hex: 0x20020005, asm: 'addi $2, $0, 5', desc: 'Load 5 into $2' },
+                { hex: 0x10400002, asm: 'beq $2, $0, 2', desc: 'Branch if $2 == 0' },
+                { hex: 0x20020000, asm: 'addi $2, $0, 0', desc: 'Clear $2' },
+                { hex: 0x20030001, asm: 'addi $3, $0, 1', desc: 'Load 1 into $3' },
+                { hex: 0x00000000, asm: 'nop', desc: 'No operation' }
+            ],
+            rtype: [
+                { hex: 0x20020008, asm: 'addi $2, $0, 8', desc: 'Load 8 into $2' },
+                { hex: 0x20030004, asm: 'addi $3, $0, 4', desc: 'Load 4 into $3' },
+                { hex: 0x00431020, asm: 'add $2, $2, $3', desc: 'Add: $2 + $3' },
+                { hex: 0x00431022, asm: 'sub $2, $2, $3', desc: 'Sub: $2 - $3' },
+                { hex: 0x00431024, asm: 'and $2, $2, $3', desc: 'AND: $2 & $3' },
+                { hex: 0x00431025, asm: 'or $2, $2, $3', desc: 'OR: $2 | $3' },
+                { hex: 0x00431004, asm: 'sll $2, $2, $3', desc: 'Shift left' },
+                { hex: 0x00000000, asm: 'nop', desc: 'No operation' }
+            ]
+        };
+        
+        let currentProgram = programs.simple;
         
         // Pipeline state
         let pipeline = {
@@ -176,9 +431,24 @@
                 const regDiv = document.createElement('div');
                 regDiv.className = 'register';
                 regDiv.id = `reg-${i}`;
-                regDiv.textContent = `$${i}: 0`;
+                regDiv.innerHTML = `$${i}<br>0`;
                 regContainer.appendChild(regDiv);
             }
+            
+            // Initialize memory display
+            const memContainer = document.getElementById('memory');
+            for (let i = 0; i < 16; i++) {
+                const memDiv = document.createElement('div');
+                memDiv.className = 'memory-cell';
+                memDiv.id = `mem-${i}`;
+                memDiv.innerHTML = `[${i}]<br>0`;
+                memContainer.appendChild(memDiv);
+            }
+            
+            // Set initial memory values for testing
+            memory[0] = 42;
+            memory[1] = 100;
+            updateMemoryDisplay();
             
             updateDisplay();
             console.log('Initialization complete');
@@ -194,22 +464,32 @@
             // WB stage
             if (pipeline.WB) {
                 executeWB(pipeline.WB);
+                stats.completed++;
             }
             newPipeline.WB = pipeline.MEM;
             
             // MEM stage
+            if (pipeline.MEM) {
+                executeMEM(pipeline.MEM);
+            }
             newPipeline.MEM = pipeline.EX;
             
             // EX stage
+            if (pipeline.EX) {
+                executeEX(pipeline.EX);
+            }
             newPipeline.EX = pipeline.ID;
             
             // ID stage
+            if (pipeline.ID) {
+                executeID(pipeline.ID);
+            }
             newPipeline.ID = pipeline.IF;
             
             // IF stage
             const instrIndex = Math.floor(pc / 4);
-            if (instrIndex < program.length) {
-                newPipeline.IF = program[instrIndex];
+            if (instrIndex < currentProgram.length) {
+                newPipeline.IF = currentProgram[instrIndex];
                 pc += 4;
             } else {
                 newPipeline.IF = null;
@@ -217,6 +497,11 @@
             
             pipeline = newPipeline;
             updateDisplay();
+            
+            // Check if pipeline is empty
+            if (!pipeline.IF && !pipeline.ID && !pipeline.EX && !pipeline.MEM && !pipeline.WB) {
+                pause();
+            }
             
             console.log('Step completed, cycle:', cycle);
         }
@@ -227,6 +512,10 @@
             const opcode = (instr.hex >> 26) & 0x3F;
             const rt = (instr.hex >> 16) & 0x1F;
             const rs = (instr.hex >> 21) & 0x1F;
+            const rd = (instr.hex >> 11) & 0x1F;
+            const func = instr.hex & 0x3F;
+            
+            console.log(`WB: ${instr.asm}`);
             
             if (opcode === 0x08 && rt !== 0) { // addi
                 const imm = instr.hex & 0xFFFF;
@@ -234,52 +523,141 @@
                 registers[rt] = registers[rs] + signExtImm;
                 highlightRegister(rt);
                 console.log(`ADDI: $${rt} = ${registers[rt]}`);
+            } else if (opcode === 0x23 && rt !== 0) { // lw
+                const imm = instr.hex & 0xFFFF;
+                const signExtImm = imm & 0x8000 ? imm - 0x10000 : imm;
+                const addr = Math.floor((registers[rs] + signExtImm) / 4);
+                if (addr >= 0 && addr < memory.length) {
+                    registers[rt] = memory[addr];
+                    highlightRegister(rt);
+                    console.log(`LW: $${rt} = mem[${addr}] = ${registers[rt]}`);
+                }
+            } else if (opcode === 0x00 && rd !== 0) { // R-type
+                if (func === 0x20) { // add
+                    registers[rd] = registers[rs] + registers[rt];
+                    highlightRegister(rd);
+                    console.log(`ADD: $${rd} = ${registers[rd]}`);
+                } else if (func === 0x22) { // sub
+                    registers[rd] = registers[rs] - registers[rt];
+                    highlightRegister(rd);
+                    console.log(`SUB: $${rd} = ${registers[rd]}`);
+                } else if (func === 0x24) { // and
+                    registers[rd] = registers[rs] & registers[rt];
+                    highlightRegister(rd);
+                    console.log(`AND: $${rd} = ${registers[rd]}`);
+                } else if (func === 0x25) { // or
+                    registers[rd] = registers[rs] | registers[rt];
+                    highlightRegister(rd);
+                    console.log(`OR: $${rd} = ${registers[rd]}`);
+                } else if (func === 0x04) { // sll
+                    registers[rd] = registers[rs] << registers[rt];
+                    highlightRegister(rd);
+                    console.log(`SLL: $${rd} = ${registers[rd]}`);
+                } else if (func === 0x06) { // srl
+                    registers[rd] = registers[rs] >>> registers[rt];
+                    highlightRegister(rd);
+                    console.log(`SRL: $${rd} = ${registers[rd]}`);
+                }
             }
+        }
+        
+        function executeMEM(instr) {
+            if (!instr) return;
+            
+            const opcode = (instr.hex >> 26) & 0x3F;
+            if (opcode === 0x2B) { // sw
+                const rs = (instr.hex >> 21) & 0x1F;
+                const rt = (instr.hex >> 16) & 0x1F;
+                const imm = instr.hex & 0xFFFF;
+                const signExtImm = imm & 0x8000 ? imm - 0x10000 : imm;
+                const addr = Math.floor((registers[rs] + signExtImm) / 4);
+                if (addr >= 0 && addr < memory.length) {
+                    memory[addr] = registers[rt];
+                    highlightMemory(addr);
+                    console.log(`SW: mem[${addr}] = $${rt}(${registers[rt]})`);
+                }
+            }
+        }
+        
+        function executeEX(instr) {
+            // Execution stage - ALU operations happen here
+            console.log(`EX: ${instr ? instr.asm : 'empty'}`);
+        }
+        
+        function executeID(instr) {
+            // Instruction decode - register reads happen here
+            console.log(`ID: ${instr ? instr.asm : 'empty'}`);
         }
         
         function highlightRegister(reg) {
             const regElement = document.getElementById(`reg-${reg}`);
             if (regElement) {
-                regElement.classList.add('changed');
-                regElement.textContent = `$${reg}: ${registers[reg]}`;
-                setTimeout(() => regElement.classList.remove('changed'), 1000);
+                regElement.classList.add('modified');
+                regElement.innerHTML = `$${reg}<br>${registers[reg]}`;
+                setTimeout(() => regElement.classList.remove('modified'), 1000);
+            }
+        }
+        
+        function highlightMemory(addr) {
+            const memElement = document.getElementById(`mem-${addr}`);
+            if (memElement) {
+                memElement.classList.add('accessed');
+                memElement.innerHTML = `[${addr}]<br>${memory[addr]}`;
+                setTimeout(() => memElement.classList.remove('accessed'), 1000);
+            }
+        }
+        
+        function updateMemoryDisplay() {
+            for (let i = 0; i < 16; i++) {
+                const memElement = document.getElementById(`mem-${i}`);
+                if (memElement) {
+                    memElement.innerHTML = `[${i}]<br>${memory[i]}`;
+                }
             }
         }
         
         function updateDisplay() {
-            // Update cycle
+            // Update cycle and PC
             document.getElementById('cycle').textContent = cycle;
-            document.getElementById('pc').textContent = pc;
+            document.getElementById('pc-value').textContent = pc;
             
             // Update pipeline stages
-            updateStage('if-stage', pipeline.IF);
-            updateStage('id-stage', pipeline.ID);
-            updateStage('ex-stage', pipeline.EX);
-            updateStage('mem-stage', pipeline.MEM);
-            updateStage('wb-stage', pipeline.WB);
+            updateStage('if-content', pipeline.IF);
+            updateStage('id-content', pipeline.ID);
+            updateStage('ex-content', pipeline.EX);
+            updateStage('mem-content', pipeline.MEM);
+            updateStage('wb-content', pipeline.WB);
+            
+            // Update stats
+            document.getElementById('instr-completed').textContent = stats.completed;
+            document.getElementById('stall-count').textContent = stats.stalls;
+            document.getElementById('forward-count').textContent = stats.forwards;
+            document.getElementById('cpi').textContent = cycle > 0 ? (cycle / Math.max(stats.completed, 1)).toFixed(2) : '1.00';
         }
         
         function updateStage(stageId, instr) {
             const container = document.getElementById(stageId);
-            if (stageId === 'if-stage') {
-                // IF stage has special content
-                const pcSpan = container.querySelector('#pc');
+            
+            if (stageId === 'if-content') {
+                // IF stage has special content with PC
+                const pcSpan = container.querySelector('#pc-value');
                 if (pcSpan) pcSpan.textContent = pc;
                 
+                // Remove existing instruction
+                const existingInstr = container.querySelector('.instruction');
+                if (existingInstr) {
+                    existingInstr.remove();
+                }
+                
                 if (instr) {
-                    let instrDiv = container.querySelector('.instruction');
-                    if (!instrDiv) {
-                        instrDiv = document.createElement('div');
-                        instrDiv.className = 'instruction';
-                        container.appendChild(instrDiv);
-                    }
-                    instrDiv.innerHTML = `<strong>${instr.asm}</strong><br><small>${instr.desc}</small>`;
-                    instrDiv.classList.add('active');
-                } else {
-                    const instrDiv = container.querySelector('.instruction');
-                    if (instrDiv) {
-                        instrDiv.remove();
-                    }
+                    const instrDiv = document.createElement('div');
+                    instrDiv.className = 'instruction active';
+                    instrDiv.innerHTML = `
+                        <div class="instr-text">${instr.asm}</div>
+                        <div class="instr-details">${instr.desc}</div>
+                        <div class="instr-details">Hex: 0x${instr.hex.toString(16).padStart(8, '0')}</div>
+                    `;
+                    container.appendChild(instrDiv);
                 }
             } else {
                 // Other stages
@@ -287,7 +665,11 @@
                 if (instr) {
                     const instrDiv = document.createElement('div');
                     instrDiv.className = 'instruction active';
-                    instrDiv.innerHTML = `<strong>${instr.asm}</strong><br><small>${instr.desc}</small>`;
+                    instrDiv.innerHTML = `
+                        <div class="instr-text">${instr.asm}</div>
+                        <div class="instr-details">${instr.desc}</div>
+                        <div class="instr-details">Hex: 0x${instr.hex.toString(16).padStart(8, '0')}</div>
+                    `;
                     container.appendChild(instrDiv);
                 }
             }
@@ -300,12 +682,7 @@
             isRunning = true;
             intervalId = setInterval(() => {
                 step();
-                
-                // Stop if pipeline is empty
-                if (!pipeline.IF && !pipeline.ID && !pipeline.EX && !pipeline.MEM && !pipeline.WB) {
-                    pause();
-                }
-            }, 1000);
+            }, currentSpeed);
         }
         
         function pause() {
@@ -323,25 +700,108 @@
             cycle = 0;
             pc = 0;
             registers.fill(0);
+            memory.fill(0);
+            memory[0] = 42; // Reset test values
+            memory[1] = 100;
             pipeline = { IF: null, ID: null, EX: null, MEM: null, WB: null };
+            stats = { completed: 0, stalls: 0, forwards: 0 };
             
             // Reset register display
             for (let i = 0; i < 32; i++) {
                 const regElement = document.getElementById(`reg-${i}`);
                 if (regElement) {
-                    regElement.textContent = `$${i}: 0`;
-                    regElement.classList.remove('changed');
+                    regElement.innerHTML = `$${i}<br>0`;
+                    regElement.classList.remove('modified');
+                }
+            }
+            
+            // Reset memory display
+            updateMemoryDisplay();
+            for (let i = 0; i < 16; i++) {
+                const memElement = document.getElementById(`mem-${i}`);
+                if (memElement) {
+                    memElement.classList.remove('accessed');
                 }
             }
             
             updateDisplay();
         }
         
+        function loadProgram(type) {
+            console.log('Loading program:', type);
+            pause();
+            
+            if (type === 'custom') {
+                const customText = document.getElementById('customProgram').value;
+                const lines = customText.trim().split('\n');
+                currentProgram = lines.map(line => {
+                    const hex = parseInt(line.trim(), 16);
+                    return { hex, asm: disassemble(hex), desc: 'Custom instruction' };
+                });
+            } else {
+                currentProgram = programs[type] || programs.simple;
+            }
+            
+            reset();
+        }
+        
+        function disassemble(instr) {
+            const opcode = (instr >> 26) & 0x3F;
+            const rs = (instr >> 21) & 0x1F;
+            const rt = (instr >> 16) & 0x1F;
+            const rd = (instr >> 11) & 0x1F;
+            const imm = instr & 0xFFFF;
+            const func = instr & 0x3F;
+            
+            switch (opcode) {
+                case 0x08: return `addi $${rt}, $${rs}, ${imm}`;
+                case 0x23: return `lw $${rt}, ${imm}($${rs})`;
+                case 0x2B: return `sw $${rt}, ${imm}($${rs})`;
+                case 0x04: return `beq $${rs}, $${rt}, ${imm}`;
+                case 0x00:
+                    switch (func) {
+                        case 0x20: return `add $${rd}, $${rs}, $${rt}`;
+                        case 0x22: return `sub $${rd}, $${rs}, $${rt}`;
+                        case 0x24: return `and $${rd}, $${rs}, $${rt}`;
+                        case 0x25: return `or $${rd}, $${rs}, $${rt}`;
+                        case 0x04: return `sll $${rd}, $${rs}, $${rt}`;
+                        case 0x06: return `srl $${rd}, $${rs}, $${rt}`;
+                        default: return 'nop';
+                    }
+                default: return 'unknown';
+            }
+        }
+        
+        function updateSpeed(value) {
+            currentSpeed = parseInt(value);
+            document.getElementById('speedValue').textContent = value + 'ms';
+            
+            // Update interval if running
+            if (isRunning) {
+                pause();
+                play();
+            }
+        }
+        
+        function updateCustomProgram() {
+            if (document.getElementById('programSelect').value === 'custom') {
+                loadProgram('custom');
+            }
+        }
+        
+        function toggleTheme() {
+            const body = document.body;
+            const currentTheme = body.getAttribute('data-theme');
+            const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+            body.setAttribute('data-theme', newTheme);
+            console.log('Theme switched to:', newTheme);
+        }
+        
         // Initialize when page loads
         window.addEventListener('load', init);
         
         // Test that JavaScript is working
-        console.log('JavaScript loaded successfully!');
+        console.log('Enhanced JavaScript loaded successfully!');
     </script>
 </body>
 </html>
