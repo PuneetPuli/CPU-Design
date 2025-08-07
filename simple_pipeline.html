@@ -483,7 +483,19 @@ ac220000
 
         function step() {
             console.log('Step button clicked!');
-            cycle++;
+
+            // Check if there's any work to do in the pipeline
+            const instrIndex = Math.floor(pc / 4);
+            const hasNewInstruction = instrIndex < currentProgram.length;
+            const hasPipelineActivity = pipeline.IF || pipeline.ID || pipeline.EX || pipeline.MEM || pipeline.WB;
+
+            // Only increment cycle if there's actual pipeline activity
+            if (hasNewInstruction || hasPipelineActivity) {
+                cycle++;
+            } else {
+                console.log('No pipeline activity - cycle not incremented');
+                return; // Exit early if no work to do
+            }
 
             // Move instructions through pipeline
             const newPipeline = {};
